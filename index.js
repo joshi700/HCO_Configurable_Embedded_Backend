@@ -22,6 +22,9 @@ app.post('/', async (req, res) => {
       "checkoutMode": "WEBSITE",
       "interaction": {
         "operation": "PURCHASE",
+        "displayControl": {
+            "billingAddress": "HIDE"
+        },
         "merchant": { 
           "name": process.env.MERCHANT_NAME || "JK Enterprises LLC",
           "url": process.env.MERCHANT_URL || "https://mastercard.com"
