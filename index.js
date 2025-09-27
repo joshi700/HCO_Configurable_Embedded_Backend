@@ -26,11 +26,11 @@ app.post('/', async (req, res) => {
           "name": process.env.MERCHANT_NAME || "JK Enterprises LLC",
           "url": process.env.MERCHANT_URL || "https://mastercard.com"
         },
-        "returnUrl": process.env.RETURN_URL || "http://localhost:3000"
+        "returnUrl": process.env.RETURN_URL || "https://hosted-checkout-embedded-page.vercel.app/ReceiptPage"
       },
       "order": {
         "currency": process.env.CURRENCY || "USD",
-        "amount": process.env.DEFAULT_AMOUNT || "250.00",
+        "amount": process.env.DEFAULT_AMOUNT || "99.00",
         "id": orderid,
         "description": process.env.ORDER_DESCRIPTION || "Goods and Services"
       }
