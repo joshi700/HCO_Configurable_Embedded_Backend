@@ -93,6 +93,9 @@ app.post('/', async (req, res) => {
       "checkoutMode": "WEBSITE",
       "interaction": {
         "operation": "PURCHASE",
+		"displayControl": {
+            "billingAddress": "HIDE"
+        },
         "merchant": { 
           "name": merchantName,
           "url": merchantUrl
