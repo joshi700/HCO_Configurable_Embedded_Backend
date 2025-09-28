@@ -44,20 +44,11 @@ app.post('/', async (req, res) => {
   try {
     console.log('Received request body:', req.body);
     
-    const trxid = crypto.randomBytes(16).toString("hex");
-    const orderid = req.body.orderId || crypto.randomBytes(16).toString("hex");
-    
-    // Extract configuration from request body or fall back to environment variables
+    // Extract authentication credentials first
     const {
       merchantId = process.env.MERCHANT_ID,
       username = process.env.MASTERCARD_USERNAME,
       password = process.env.MASTERCARD_PASSWORD,
-      merchantName = process.env.MERCHANT_NAME || "JK Enterprises LLC",
-      merchantUrl = process.env.MERCHANT_URL || "https://microsoft.com/",
-      currency = process.env.CURRENCY || "USD",
-      amount = process.env.DEFAULT_AMOUNT || "99.00",
-      description = process.env.ORDER_DESCRIPTION || "Goods and Services",
-      returnUrl = process.env.RETURN_URL || "https://hco-configurable-embedded.vercel.app/ReceiptPage",
       apiBaseUrl = process.env.MASTERCARD_API_BASE_URL || "https://mtf.gateway.mastercard.com",
       apiVersion = process.env.API_VERSION || "73"
     } = req.body;
@@ -74,43 +65,79 @@ app.post('/', async (req, res) => {
       });
     }
 
-    console.log('Using configuration:', {
-      merchantId: merchantId,
-      merchantName: merchantName,
-      merchantUrl: merchantUrl,
-      currency: currency,
-      amount: amount,
-      description: description,
-      returnUrl: returnUrl,
-      apiBaseUrl: apiBaseUrl,
-      apiVersion: apiVersion,
-      orderId: orderid
-    });
-    
-    // Create the payment session request body
-    const postData = {
-      "apiOperation": "INITIATE_CHECKOUT",
-      "checkoutMode": "WEBSITE",
-      "interaction": {
-        "operation": "PURCHASE",
-		"displayControl": {
-            "billingAddress": "HIDE"
-        },
-        "merchant": { 
-          "name": merchantName,
-          "url": merchantUrl
-        },
-        "returnUrl": returnUrl
-      },
-      "order": {
-        "currency": currency,
-        "amount": amount,
-        "id": orderid,
-        "description": description
-      }
-    };
+    let postData;
+    let orderid;
 
-    console.log('Request payload:', JSON.stringify(postData, null, 2));
+    // Check if this is advanced JSON mode
+    if (req.body.apiOperation && req.body.order && req.body.interaction) {
+      // Advanced JSON Mode - use the payload as provided
+      console.log('Advanced JSON Mode detected');
+      
+      postData = {
+        apiOperation: req.body.apiOperation,
+        checkoutMode: req.body.checkoutMode,
+        interaction: req.body.interaction,
+        order: req.body.order
+      };
+      
+      orderid = req.body.order.id;
+      
+      console.log('Advanced mode payload:', JSON.stringify(postData, null, 2));
+      
+    } else {
+      // Simple Mode - construct payload from individual fields
+      console.log('Simple Mode detected');
+      
+      const trxid = crypto.randomBytes(16).toString("hex");
+      orderid = req.body.orderId || crypto.randomBytes(16).toString("hex");
+      
+      const {
+        merchantName = process.env.MERCHANT_NAME || "JK Enterprises LLC",
+        merchantUrl = process.env.MERCHANT_URL || "https://microsoft.com/",
+        currency = process.env.CURRENCY || "USD",
+        amount = process.env.DEFAULT_AMOUNT || "99.00",
+        description = process.env.ORDER_DESCRIPTION || "Goods and Services",
+        returnUrl = process.env.RETURN_URL || "https://hco-configurable-embedded.vercel.app/ReceiptPage"
+      } = req.body;
+
+      console.log('Using simple mode configuration:', {
+        merchantId: merchantId,
+        merchantName: merchantName,
+        merchantUrl: merchantUrl,
+        currency: currency,
+        amount: amount,
+        description: description,
+        returnUrl: returnUrl,
+        apiBaseUrl: apiBaseUrl,
+        apiVersion: apiVersion,
+        orderId: orderid
+      });
+      
+      // Create the payment session request body for simple mode
+      postData = {
+        "apiOperation": "INITIATE_CHECKOUT",
+        "checkoutMode": "WEBSITE",
+        "interaction": {
+          "operation": "PURCHASE",
+          "displayControl": {
+            "billingAddress": "HIDE"
+          },
+          "merchant": { 
+            "name": merchantName,
+            "url": merchantUrl
+          },
+          "returnUrl": returnUrl
+        },
+        "order": {
+          "currency": currency,
+          "amount": amount,
+          "id": orderid,
+          "description": description
+        }
+      };
+      
+      console.log('Simple mode payload:', JSON.stringify(postData, null, 2));
+    }
 
     // Create the Basic Auth token from username and password
     const authToken = Buffer.from(`${username}:${password}`).toString('base64');
@@ -139,7 +166,8 @@ app.post('/', async (req, res) => {
     res.json({ 
       sessionId: sessionId,
       orderId: orderid,
-      status: 'success'
+      status: 'success',
+      mode: req.body.apiOperation ? 'advanced' : 'simple'
     });
 
   } catch (error) {
