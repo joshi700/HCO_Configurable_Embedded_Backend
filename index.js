@@ -2,11 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const crypto = require("crypto");
-require('dotenv').config(); // Load environment variables
+require('dotenv').config();
 
 const app = express();
+const port = process.env.PORT || 3005;
 
-// Configure CORS properly
+// CRITICAL: Set up CORS BEFORE any routes
 app.use(cors({
   origin: [
     'https://hco-configurable-embedded.vercel.app',
@@ -14,20 +15,29 @@ app.use(cors({
     'http://localhost:3001'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
+
+// Handle preflight OPTIONS requests explicitly
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', 'https://hco-configurable-embedded.vercel.app');
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.status(200).end();
+});
 
 app.use(express.json());
 
-const port = process.env.PORT || 3005;
-
-// Add OPTIONS handler for preflight requests
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin);
+// Add headers to all responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'https://hco-configurable-embedded.vercel.app');
   res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.status(200).end();
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
 });
 
 app.post('/', async (req, res) => {
@@ -108,7 +118,7 @@ app.post('/', async (req, res) => {
         'Authorization': `Basic ${authToken}`,
         "Accept": "application/json"
       },
-      timeout: 30000 // 30 second timeout
+      timeout: 30000
     };
 
     // Construct the API URL
@@ -132,7 +142,6 @@ app.post('/', async (req, res) => {
   } catch (error) {
     console.error("Error details:");
     if (error.response) {
-      // The request was made and the server responded with a status code
       console.error("Status:", error.response.status);
       console.error("Headers:", error.response.headers);
       console.error("Data:", error.response.data);
@@ -142,14 +151,12 @@ app.post('/', async (req, res) => {
         status: error.response.status
       });
     } else if (error.request) {
-      // The request was made but no response was received
       console.error("Request:", error.request);
       res.status(500).json({ 
         error: "Network Error", 
         details: "No response received from Mastercard API"
       });
     } else {
-      // Something happened in setting up the request that triggered an Error
       console.error("Error:", error.message);
       res.status(500).json({ 
         error: "Request Error", 
@@ -159,17 +166,18 @@ app.post('/', async (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check endpoint with CORS headers
 app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
     port: port,
-    env: {
-      merchantId: process.env.MERCHANT_ID ? 'Set' : 'Not set',
-      username: process.env.MASTERCARD_USERNAME ? 'Set' : 'Not set',
-      password: process.env.MASTERCARD_PASSWORD ? 'Set' : 'Not set'
-    }
+    cors: 'enabled',
+    allowedOrigins: [
+      'https://hco-configurable-embedded.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001'
+    ]
   });
 });
 
@@ -192,7 +200,8 @@ app.post('/test-config', (req, res) => {
       apiBaseUrl: apiBaseUrl || 'Using default',
       apiVersion: apiVersion || 'Using default'
     },
-    constructedApiUrl: `${apiBaseUrl || 'https://mtf.gateway.mastercard.com'}/api/rest/version/${apiVersion || '73'}/merchant/${merchantId || 'MERCHANT_ID'}/session`
+    constructedApiUrl: `${apiBaseUrl || 'https://mtf.gateway.mastercard.com'}/api/rest/version/${apiVersion || '73'}/merchant/${merchantId || 'MERCHANT_ID'}/session`,
+    cors: 'Headers added to response'
   });
 });
 
@@ -218,10 +227,9 @@ app.listen(port, () => {
   console.log(`📋 Health check available at http://localhost:${port}/health`);
   console.log(`🧪 Test config endpoint at http://localhost:${port}/test-config`);
   console.log('');
-  console.log('Environment variables status:');
-  console.log(`- MERCHANT_ID: ${process.env.MERCHANT_ID ? 'Set' : 'Not set'}`);
-  console.log(`- MASTERCARD_USERNAME: ${process.env.MASTERCARD_USERNAME ? 'Set' : 'Not set'}`);
-  console.log(`- MASTERCARD_PASSWORD: ${process.env.MASTERCARD_PASSWORD ? 'Set' : 'Not set'}`);
-  console.log(`- API_VERSION: ${process.env.API_VERSION || 'Not set (using default: 73)'}`);
-  console.log(`- MASTERCARD_API_BASE_URL: ${process.env.MASTERCARD_API_BASE_URL || 'Not set (using default)'}`);
+  console.log('CORS Configuration:');
+  console.log('- Allowed Origins: https://hco-configurable-embedded.vercel.app');
+  console.log('- Methods: GET, POST, PUT, DELETE, OPTIONS');
+  console.log('- Headers: Content-Type, Authorization, X-Requested-With');
+  console.log('- Credentials: true');
 });
