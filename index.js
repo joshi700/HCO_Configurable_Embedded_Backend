@@ -2,15 +2,33 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const crypto = require("crypto");
-const http = require('http');
-const https = require('https');
 require('dotenv').config(); // Load environment variables
 
 const app = express();
-app.use(cors());
+
+// Configure CORS properly
+app.use(cors({
+  origin: [
+    'https://hco-configurable-embedded.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
+  ],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 const port = process.env.PORT || 3005;
+
+// Add OPTIONS handler for preflight requests
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.status(200).end();
+});
 
 app.post('/', async (req, res) => {
   try {
@@ -21,18 +39,30 @@ app.post('/', async (req, res) => {
     
     // Extract configuration from request body or fall back to environment variables
     const {
-      merchantId = process.env.MERCHANT_ID || "TESTMIDtesting00",
-      username = process.env.MASTERCARD_USERNAME || "merchant.TESTMIDtesting00",
-      password = process.env.MASTERCARD_PASSWORD || "9233298fcaa1c01f578759954343aca1",
+      merchantId = process.env.MERCHANT_ID,
+      username = process.env.MASTERCARD_USERNAME,
+      password = process.env.MASTERCARD_PASSWORD,
       merchantName = process.env.MERCHANT_NAME || "JK Enterprises LLC",
       merchantUrl = process.env.MERCHANT_URL || "https://microsoft.com/",
       currency = process.env.CURRENCY || "USD",
       amount = process.env.DEFAULT_AMOUNT || "99.00",
       description = process.env.ORDER_DESCRIPTION || "Goods and Services",
-      returnUrl = process.env.RETURN_URL || "https://hco-configurable-embedded.vercel.app/ReceiptPage",
+      returnUrl = process.env.RETURN_URL || "https://hosted-checkout-embedded-page.vercel.app/ReceiptPage",
       apiBaseUrl = process.env.MASTERCARD_API_BASE_URL || "https://mtf.gateway.mastercard.com",
       apiVersion = process.env.API_VERSION || "73"
     } = req.body;
+
+    // Validate required fields
+    if (!merchantId || !username || !password) {
+      return res.status(400).json({
+        error: 'Missing required credentials',
+        details: {
+          merchantId: !merchantId ? 'Missing' : 'Present',
+          username: !username ? 'Missing' : 'Present',
+          password: !password ? 'Missing' : 'Present'
+        }
+      });
+    }
 
     console.log('Using configuration:', {
       merchantId: merchantId,
@@ -75,10 +105,10 @@ app.post('/', async (req, res) => {
     const axiosConfig = {
       headers: {
         'Content-Type': 'application/json;charset=UTF-8',
-        "Access-Control-Allow-Origin": "*",
         'Authorization': `Basic ${authToken}`,
         "Accept": "application/json"
-      }
+      },
+      timeout: 30000 // 30 second timeout
     };
 
     // Construct the API URL
@@ -92,7 +122,13 @@ app.post('/', async (req, res) => {
     
     const sessionId = response.data.session.id;
 
-    res.send(sessionId);
+    // Return proper JSON response
+    res.json({ 
+      sessionId: sessionId,
+      orderId: orderid,
+      status: 'success'
+    });
+
   } catch (error) {
     console.error("Error details:");
     if (error.response) {
@@ -128,7 +164,12 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    port: port 
+    port: port,
+    env: {
+      merchantId: process.env.MERCHANT_ID ? 'Set' : 'Not set',
+      username: process.env.MASTERCARD_USERNAME ? 'Set' : 'Not set',
+      password: process.env.MASTERCARD_PASSWORD ? 'Set' : 'Not set'
+    }
   });
 });
 
@@ -155,13 +196,32 @@ app.post('/test-config', (req, res) => {
   });
 });
 
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    details: err.message
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    details: `Route ${req.method} ${req.path} not found`
+  });
+});
+
 app.listen(port, () => {
   console.log(`🚀 Mastercard Checkout API Server running at http://localhost:${port}`);
   console.log(`📋 Health check available at http://localhost:${port}/health`);
   console.log(`🧪 Test config endpoint at http://localhost:${port}/test-config`);
   console.log('');
-  console.log('Environment variables loaded:');
-  console.log(`- MERCHANT_ID: ${process.env.MERCHANT_ID || 'Not set (using default)'}`);
-  console.log(`- API_VERSION: ${process.env.API_VERSION || 'Not set (using default)'}`);
+  console.log('Environment variables status:');
+  console.log(`- MERCHANT_ID: ${process.env.MERCHANT_ID ? 'Set' : 'Not set'}`);
+  console.log(`- MASTERCARD_USERNAME: ${process.env.MASTERCARD_USERNAME ? 'Set' : 'Not set'}`);
+  console.log(`- MASTERCARD_PASSWORD: ${process.env.MASTERCARD_PASSWORD ? 'Set' : 'Not set'}`);
+  console.log(`- API_VERSION: ${process.env.API_VERSION || 'Not set (using default: 73)'}`);
   console.log(`- MASTERCARD_API_BASE_URL: ${process.env.MASTERCARD_API_BASE_URL || 'Not set (using default)'}`);
 });
