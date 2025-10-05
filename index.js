@@ -50,7 +50,7 @@ app.post('/', async (req, res) => {
       username = process.env.MASTERCARD_USERNAME,
       password = process.env.MASTERCARD_PASSWORD,
       apiBaseUrl = process.env.MASTERCARD_API_BASE_URL || "https://mtf.gateway.mastercard.com",
-      apiVersion = process.env.API_VERSION || "73"
+      apiVersion = process.env.API_VERSION || "100"
     } = req.body;
 
     // Validate required fields
@@ -67,7 +67,7 @@ app.post('/', async (req, res) => {
 
     let postData;
     let orderid;
-
+    
     // Check if this is advanced JSON mode
     if (req.body.apiOperation && req.body.order && req.body.interaction) {
       // Advanced JSON Mode - use the payload as provided
@@ -88,8 +88,8 @@ app.post('/', async (req, res) => {
       // Simple Mode - construct payload from individual fields
       console.log('Simple Mode detected');
       
-      const trxid = crypto.randomBytes(16).toString("hex");
-      orderid = req.body.orderId || crypto.randomBytes(16).toString("hex");
+      const trxid = crypto.randomBytes(8).toString("hex");
+      orderid = req.body.orderId || crypto.randomBytes(8).toString("hex");
       
       const {
         merchantName = process.env.MERCHANT_NAME || "JK Enterprises LLC",
