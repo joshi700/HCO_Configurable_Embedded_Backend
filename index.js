@@ -50,7 +50,7 @@ app.post('/', async (req, res) => {
       username = process.env.MASTERCARD_USERNAME,
       password = process.env.MASTERCARD_PASSWORD,
       apiBaseUrl = process.env.MASTERCARD_API_BASE_URL || "https://mtf.gateway.mastercard.com",
-      apiVersion = process.env.API_VERSION || "100"
+      apiVersion = process.env.API_VERSION || "73"
     } = req.body;
 
     // Validate required fields
